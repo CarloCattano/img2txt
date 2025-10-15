@@ -16,8 +16,10 @@ Build the tool
 Run
 
 ```
-./img2txt <image.[png/jpg]> <size>
+./img2txt <image.(png/jpg)> [<size>]
 ```
+
+_img2txt_ picture.jpg, will default to your current terminal size
 
 ```
    .'.,,'^-^^^-'    '   '.              .                   .  .

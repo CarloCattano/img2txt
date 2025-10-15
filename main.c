@@ -1,51 +1,44 @@
-/**
- * Adapted from Daniel Shifmann image/video to ascii originally in p5.js
- *  by Carlo Cattano 2023
- **/
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include "stb_image_resize2.h"
-
-#define CLS "\033[2J"
-
-// map 0 to 255 to 0 to 1
-#define MAP(x, in_min, in_max, out_min, out_max)                               \
-  ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
-
-// TODO
-/** Array of color escape sequeces
- * to map to the color retrieved from the image pixels
- * In this way , we add color to each letter as a prepended  escape sequence
- * Thus changing our buffer size to 5 chars for escape sequence and 1 char for
- * the letter
- */
-
-// Colors array with escape sequences
-char *colors[] = {
-    "\033[0;30m", // black
-    "\033[0;31m", // red
-    "\033[0;32m", // green
-    "\033[0;33m", // yellow
-    "\033[0;34m", // blue
-    "\033[0;35m", // magenta
-    "\033[0;36m", // cyan
-    "\033[0;37m", // white
-};
-
-// -------------------------------
+#include "img2txt.h"
 
 int main(int ac, char **av) {
+  int color_mode = 256; // Default to 256 colors
+  int new_width;
 
-  if (ac != 3) {
-    printf("Usage: %s <image> <size>\n", av[0]);
+  if (ac < 2 || ac > 4) {
+    printf("Usage: %s <image> [<size>] [--colors=8|256]\n", av[0]);
+    exit(1);
+  }
+
+  switch (ac) {
+  case 2:
+    if (isatty(STDOUT_FILENO)) {
+      new_width = get_terminal_width();
+    }
+    break;
+  case 3:
+    new_width = atoi(av[2]);
+    break;
+  case 4:
+    new_width = atoi(av[2]);
+    if (strcmp(av[3], "--colors=8") == 0) {
+      color_mode = 8;
+    } else if (strcmp(av[3], "--colors=256") == 0) {
+      color_mode = 256;
+    } else {
+      printf("Invalid color mode. Use --colors=8 or --colors=256\n");
+      exit(1);
+    }
+    break;
+
+  default:
+    printf("Usage: %s <image> [<size>] [--colors=8|256]\n", av[0]);
+    exit(1);
+  }
+
+  if (new_width <= 0 || new_width >= 1500) {
+    printf("Size must be between 1 and 1500\n");
     exit(1);
   }
 
@@ -56,53 +49,75 @@ int main(int ac, char **av) {
     printf("Error in loading the image\n");
     exit(1);
   }
-
-  int new_width = atoi(av[2]);
-  int new_height = new_width;
-
-  unsigned char *new_img = malloc(new_width * new_height * channels);
-
-  stbir_resize_uint8_linear(img, width, height, 0, new_img, new_width,
-                            new_height, 0, channels);
-
-  if (new_img == NULL) {
-    printf("Error in resizing the image\n");
+  if (channels < 3) {
+    printf("Image must be RGB or RGBA.\n");
     stbi_image_free(img);
     exit(1);
   }
 
-  char buffer[new_width * new_height];
+  // Preserve aspect ratio, characters are roughly 2x taller than wide
+  int new_height =
+      (int)((float)new_width * ((float)height / (float)width) / 2.0f);
 
-  const char density[] = "@/\\O1?oc^-,'.        ";
+  unsigned char *new_img = malloc(new_width * new_height * channels);
+  if (new_img == NULL) {
+    printf("Error in allocating memory for the new image\n");
+    stbi_image_free(img);
+    exit(1);
+  }
 
-  // TODO colors buffer to store the color escape sequence and the letter
-  // char colors_buffer[new_width * new_height * 6];
+  if (stbir_resize_uint8_linear(img, width, height, 0, new_img, new_width,
+                                new_height, 0,
+                                (stbir_pixel_layout)channels) == 0) {
+    printf("Error resizing image\n");
+    stbi_image_free(img);
+    free(new_img);
+    exit(1);
+  }
 
-  for (int i = 0; i < new_width; i++) {
-    for (int j = 0; j < new_height; j++) {
+  // Allocate buffer for the whole output
+  size_t buffer_size =
+      (size_t)new_height * (new_width * 13 + 1) + strlen(RESET_COLOR) + 1;
+  char *output_buffer = malloc(buffer_size);
+  if (output_buffer == NULL) {
+    printf("Error allocating output buffer\n");
+    stbi_image_free(img);
+    free(new_img);
+    exit(1);
+  }
+  char *p = output_buffer;
+
+  const int density_len = strlen(DENSITY);
+
+  for (int i = 0; i < new_height; i++) {
+    for (int j = 0; j < new_width; j++) {
       int index = (i * new_width + j) * channels;
-      float r = new_img[index];
-      float g = new_img[index + 1];
-      float b = new_img[index + 2];
+      unsigned char r = new_img[index];
+      unsigned char g = new_img[index + 1];
+      unsigned char b = new_img[index + 2];
+
+      if (color_mode == 8) {
+        int color_index = get_closest_color8(r, g, b);
+        p += sprintf(p, "%s", colors8[color_index]);
+      } else {
+        int color_index = get_closest_xterm_color(r, g, b);
+        p += sprintf(p, "\033[38;5;%dm", color_index);
+      }
 
       float avg = (r + g + b) / 3.0;
-      int len = strlen(density);
-      char c = density[(unsigned int)MAP(avg, 255, 0, 0, len)];
-      buffer[i * new_width + j] = c;
+      char c = DENSITY[(unsigned int)MAP(avg, 255, 0, 0, density_len - 1)];
+      *p++ = c;
     }
+    *p++ = '\n';
   }
+  p += sprintf(p, "%s", RESET_COLOR);
+  *p = '\0';
 
   write(1, CLS, 4); // clear screen
-
-  for (int i = 0; i < new_width; i++) {
-    for (int j = 0; j < new_height; j++) {
-      char c = buffer[i * new_width + j];
-      write(1, &c, 1);
-    }
-    write(1, "\n", 1);
-  }
+  write(1, output_buffer, strlen(output_buffer));
 
   stbi_image_free(img);
   free(new_img);
+  free(output_buffer);
   return 0;
 }
