@@ -1,40 +1,50 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "img2txt.h"
+#include <getopt.h>
+#include <unistd.h>
+
+void print_usage(const char *prog_name) {
+  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] <image>\n", prog_name);
+}
 
 int main(int ac, char **av) {
   int color_mode = 256; // Default to 256 colors
-  int new_width;
+  int new_width = 0;
+  int opt;
 
-  if (ac < 2 || ac > 4) {
-    printf("Usage: %s <image> [<size>] [--colors=8|256]\n", av[0]);
+  while ((opt = getopt(ac, av, "s:c:")) != -1) {
+    switch (opt) {
+    case 's':
+      new_width = atoi(optarg);
+      break;
+    case 'c':
+      color_mode = atoi(optarg);
+      if (color_mode != 8 && color_mode != 256) {
+        fprintf(stderr, "Invalid color mode. Use 8 or 256\n");
+        print_usage(av[0]);
+        exit(1);
+      }
+      break;
+
+    default:
+      print_usage(av[0]);
+      exit(1);
+    }
+  }
+
+  if (optind >= ac) {
+    fprintf(stderr, "Error: Missing image file\n");
+    print_usage(av[0]);
     exit(1);
   }
 
-  switch (ac) {
-  case 2:
+  if (new_width == 0) {
     if (isatty(STDOUT_FILENO)) {
       new_width = get_terminal_width();
-    }
-    break;
-  case 3:
-    new_width = atoi(av[2]);
-    break;
-  case 4:
-    new_width = atoi(av[2]);
-    if (strcmp(av[3], "--colors=8") == 0) {
-      color_mode = 8;
-    } else if (strcmp(av[3], "--colors=256") == 0) {
-      color_mode = 256;
     } else {
-      printf("Invalid color mode. Use --colors=8 or --colors=256\n");
-      exit(1);
+      new_width = 80; // Default width if not a tty
     }
-    break;
-
-  default:
-    printf("Usage: %s <image> [<size>] [--colors=8|256]\n", av[0]);
-    exit(1);
   }
 
   if (new_width <= 0 || new_width >= 1500) {
@@ -43,7 +53,7 @@ int main(int ac, char **av) {
   }
 
   int width, height, channels;
-  unsigned char *img = stbi_load(av[1], &width, &height, &channels, 0);
+  unsigned char *img = stbi_load(av[optind], &width, &height, &channels, 0);
 
   if (img == NULL) {
     printf("Error in loading the image\n");
