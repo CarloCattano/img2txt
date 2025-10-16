@@ -11,7 +11,7 @@
 #include "stb_image.h"
 #include "stb_image_resize2.h"
 
-#define CLS "\033[2J"
+#define CLS "\033[2J\033[H"
 #define RESET_COLOR "\033[0m"
 #define DENSITY "@/\\O1?oc^-,'.        "
 #define MAX_WIDTH 1500

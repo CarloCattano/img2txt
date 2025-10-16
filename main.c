@@ -93,6 +93,7 @@ int main(int ac, char **av) {
   if (new_width == 0) {
     if (isatty(STDOUT_FILENO))
       new_width = get_terminal_width();
+
     else
       new_width = 80; // Default width if not a tty
   }
