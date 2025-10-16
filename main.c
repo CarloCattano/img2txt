@@ -5,15 +5,19 @@
 #include <unistd.h>
 
 void print_usage(const char *prog_name) {
-  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] <image>\n", prog_name);
+  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] [-C] <image> or pipe\n",
+          prog_name);
 }
 
 int main(int ac, char **av) {
   int color_mode = 256; // Default to 256 colors
   int new_width = 0;
   int opt;
+  int width, height, channels;
+  unsigned char *img = NULL;
+  int clear_screen = 1;
 
-  while ((opt = getopt(ac, av, "s:c:")) != -1) {
+  while ((opt = getopt(ac, av, "s:c:C")) != -1) {
     switch (opt) {
     case 's':
       new_width = atoi(optarg);
@@ -26,7 +30,9 @@ int main(int ac, char **av) {
         exit(1);
       }
       break;
-
+    case 'C':
+      clear_screen = 0;
+      break;
     default:
       print_usage(av[0]);
       exit(1);
@@ -34,33 +40,70 @@ int main(int ac, char **av) {
   }
 
   if (optind >= ac) {
-    fprintf(stderr, "Error: Missing image file\n");
-    print_usage(av[0]);
+    if (isatty(STDIN_FILENO)) {
+      fprintf(stderr, "Error: Missing image file or piped data\n");
+      print_usage(av[0]);
+      exit(1);
+    }
+
+    // Read from stdin
+    size_t capacity = 1024 * 1024; // 1MB initial capacity
+    size_t total_read = 0;
+    unsigned char *buffer = malloc(capacity);
+    if (!buffer) {
+      perror("Failed to allocate buffer for stdin");
+      exit(1);
+    }
+
+    size_t bytes_read;
+    while ((bytes_read = read(STDIN_FILENO, buffer + total_read,
+                              capacity - total_read)) > 0) {
+      total_read += bytes_read;
+      if (total_read == capacity) {
+        capacity *= 2;
+        unsigned char *new_buffer = realloc(buffer, capacity);
+        if (!new_buffer) {
+          perror("Failed to reallocate buffer for stdin");
+          free(buffer);
+          exit(1);
+        }
+        buffer = new_buffer;
+      }
+    }
+
+    if (total_read == 0) {
+      fprintf(stderr, "Error: No data read from stdin\n");
+      free(buffer);
+      exit(1);
+    }
+
+    img = stbi_load_from_memory(buffer, (int)total_read, &width, &height,
+                                &channels, 0);
+    free(buffer);
+
+  } else {
+    img = stbi_load(av[optind], &width, &height, &channels, 0);
+  }
+
+  if (img == NULL) {
+    fprintf(stderr, "Error in loading the image\n");
     exit(1);
   }
 
   if (new_width == 0) {
-    if (isatty(STDOUT_FILENO)) {
+    if (isatty(STDOUT_FILENO))
       new_width = get_terminal_width();
-    } else {
+    else
       new_width = 80; // Default width if not a tty
-    }
   }
 
-  if (new_width <= 0 || new_width >= 1500) {
-    printf("Size must be between 1 and 1500\n");
+  if (new_width <= 0 || new_width >= MAX_WIDTH) {
+    fprintf(stderr, "Size must be between 1 and %d\n", MAX_WIDTH);
     exit(1);
   }
 
-  int width, height, channels;
-  unsigned char *img = stbi_load(av[optind], &width, &height, &channels, 0);
-
-  if (img == NULL) {
-    printf("Error in loading the image\n");
-    exit(1);
-  }
   if (channels < 3) {
-    printf("Image must be RGB or RGBA.\n");
+    fprintf(stderr, "Image must be RGB or RGBA.\n");
     stbi_image_free(img);
     exit(1);
   }
@@ -71,7 +114,7 @@ int main(int ac, char **av) {
 
   unsigned char *new_img = malloc(new_width * new_height * channels);
   if (new_img == NULL) {
-    printf("Error in allocating memory for the new image\n");
+    fprintf(stderr, "Error in allocating memory for the new image\n");
     stbi_image_free(img);
     exit(1);
   }
@@ -79,7 +122,7 @@ int main(int ac, char **av) {
   if (stbir_resize_uint8_linear(img, width, height, 0, new_img, new_width,
                                 new_height, 0,
                                 (stbir_pixel_layout)channels) == 0) {
-    printf("Error resizing image\n");
+    fprintf(stderr, "Error resizing image\n");
     stbi_image_free(img);
     free(new_img);
     exit(1);
@@ -87,14 +130,18 @@ int main(int ac, char **av) {
 
   // Allocate buffer for the whole output
   size_t buffer_size =
-      (size_t)new_height * (new_width * 13 + 1) + strlen(RESET_COLOR) + 1;
+      (size_t)new_height * (new_width * ANSI_ESCAPE_SEQUENCE_MAX_LEN + 1) +
+      strlen(RESET_COLOR) + 1;
+
   char *output_buffer = malloc(buffer_size);
+
   if (output_buffer == NULL) {
-    printf("Error allocating output buffer\n");
+    fprintf(stderr, "Error allocating output buffer\n");
     stbi_image_free(img);
     free(new_img);
     exit(1);
   }
+
   char *p = output_buffer;
 
   const int density_len = strlen(DENSITY);
@@ -123,7 +170,9 @@ int main(int ac, char **av) {
   p += sprintf(p, "%s", RESET_COLOR);
   *p = '\0';
 
-  write(1, CLS, 4); // clear screen
+  if (clear_screen)
+    write(1, CLS, 4); // clear screen
+
   write(1, output_buffer, strlen(output_buffer));
 
   stbi_image_free(img);

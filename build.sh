@@ -8,7 +8,7 @@ if [ -f ./img2txt ]; then
     rm ./img2txt
 fi
 
-cc main.c -o img2txt -lm
+cc main.c -o img2txt -lm -Wall -Wextra -O3
 
 if [ $? -eq 0 ]; then
     printf "\n$GREEN Build successful!$RST" 

@@ -14,6 +14,8 @@
 #define CLS "\033[2J"
 #define RESET_COLOR "\033[0m"
 #define DENSITY "@/\\O1?oc^-,'.        "
+#define MAX_WIDTH 1500
+#define ANSI_ESCAPE_SEQUENCE_MAX_LEN 13
 
 // map 0 to 255 to 0 to 1
 #define MAP(x, in_min, in_max, out_min, out_max)                               \
