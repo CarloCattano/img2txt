@@ -16,7 +16,7 @@ Build the tool
 Run
 
 ```
-./img2txt <image.(png/jpg)> -s size -c 256
+./img2txt <image.(png/jpg)> [-s size] [-c 256]
 ```
 
 You can also pipe an image into the program:
