@@ -5,8 +5,48 @@
 #include <unistd.h>
 
 void print_usage(const char *prog_name) {
-  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] [-C] <image> or pipe\n",
+  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] <image> or pipe\n",
           prog_name);
+}
+
+unsigned char *read_from_pipe(int *width, int *height, int *channels) {
+
+  unsigned char *img = NULL;
+  size_t capacity = 1024 * 1024;
+  size_t total_read = 0;
+
+  unsigned char *buffer = malloc(capacity);
+  if (!buffer) {
+    perror("Failed to allocate buffer for stdin");
+    exit(1);
+  }
+
+  size_t bytes_read;
+  while ((bytes_read = read(STDIN_FILENO, buffer + total_read,
+                            capacity - total_read)) > 0) {
+    total_read += bytes_read;
+    if (total_read == capacity) {
+      capacity *= 2;
+      unsigned char *new_buffer = realloc(buffer, capacity);
+      if (!new_buffer) {
+        perror("Failed to reallocate buffer for stdin");
+        free(buffer);
+        exit(1);
+      }
+      buffer = new_buffer;
+    }
+  }
+
+  if (total_read == 0) {
+    fprintf(stderr, "Error: No data read from stdin\n");
+    free(buffer);
+    exit(1);
+  }
+
+  img = stbi_load_from_memory(buffer, (int)total_read, width, height, channels,
+                              0);
+  free(buffer);
+  return img;
 }
 
 int main(int ac, char **av) {
@@ -46,40 +86,7 @@ int main(int ac, char **av) {
       exit(1);
     }
 
-    // Read from stdin
-    size_t capacity = 1024 * 1024; // 1MB initial capacity
-    size_t total_read = 0;
-    unsigned char *buffer = malloc(capacity);
-    if (!buffer) {
-      perror("Failed to allocate buffer for stdin");
-      exit(1);
-    }
-
-    size_t bytes_read;
-    while ((bytes_read = read(STDIN_FILENO, buffer + total_read,
-                              capacity - total_read)) > 0) {
-      total_read += bytes_read;
-      if (total_read == capacity) {
-        capacity *= 2;
-        unsigned char *new_buffer = realloc(buffer, capacity);
-        if (!new_buffer) {
-          perror("Failed to reallocate buffer for stdin");
-          free(buffer);
-          exit(1);
-        }
-        buffer = new_buffer;
-      }
-    }
-
-    if (total_read == 0) {
-      fprintf(stderr, "Error: No data read from stdin\n");
-      free(buffer);
-      exit(1);
-    }
-
-    img = stbi_load_from_memory(buffer, (int)total_read, &width, &height,
-                                &channels, 0);
-    free(buffer);
+    img = read_from_pipe(&width, &height, &channels);
 
   } else {
     img = stbi_load(av[optind], &width, &height, &channels, 0);
@@ -98,8 +105,8 @@ int main(int ac, char **av) {
       new_width = 80; // Default width if not a tty
   }
 
-  if (new_width <= 0 || new_width >= MAX_WIDTH) {
-    fprintf(stderr, "Size must be between 1 and %d\n", MAX_WIDTH);
+  if (new_width <= 7 || new_width >= MAX_WIDTH) {
+    fprintf(stderr, "Size must be between 8 and %d\n", MAX_WIDTH);
     exit(1);
   }
 
@@ -111,7 +118,7 @@ int main(int ac, char **av) {
 
   // Preserve aspect ratio, characters are roughly 2x taller than wide
   int new_height =
-      (int)((float)new_width * ((float)height / (float)width) / 2.0f);
+      (int)((float)new_width * ((float)height / (float)width) / 2.4f);
 
   unsigned char *new_img = malloc(new_width * new_height * channels);
   if (new_img == NULL) {
