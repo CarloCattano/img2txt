@@ -18,8 +18,14 @@ make
 Run
 
 ```
-./img2txt <image.(png/jpg)> [-s size] [-c 256]
+./img2txt <image.(png/jpg)> [-s size] [-c 256] [-l "+-$%@":,.     "]
 ```
+
+optional parameters:
+
+- -s size: set the output size (width)x(height), default is terminal size
+- -c 256: set the number of colors to use (default 256)
+- -l "+-$%@":,. ": set the characters to use from darkest to light
 
 You can also pipe an image into the program:
 
@@ -38,3 +44,4 @@ _img2txt_ picture.jpg, will default to your current terminal size
 
 zebra.jpg [Author](https://www.publicdomainpictures.net/en/view-image.php?image=455680&picture=zebra)
 License: CC0 Public Domain
+```

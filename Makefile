@@ -14,9 +14,8 @@ debug:
 $(NAME): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 	@printf "$(NAME) compiled successfully!\n"
-	@printf "\nUsage:\n\timg2txt <image.[png/jpg]> [-s size] [-c 256]\n"
+	@printf "\nUsage:\n\timg2txt <image.[png/jpg]> [-s size] [-c 256] [-l 'AEIOUuopdv    '\n"
 	@printf "example:\n./img2txt zebra.jpg -s 84\n"
-	@printf "./img2txt zebra.jpg\tDefaults to current tty size\n"
 	@printf "./img2txt zebra.jpg 42 -c 8 \t# 8-bit color: default its 255\n \n"
 
 clean:

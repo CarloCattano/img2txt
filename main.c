@@ -8,7 +8,8 @@
 #define BG_MODE 0
 
 void print_usage(const char *prog_name) {
-  fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] <image> or pipe\n",
+  fprintf(stderr,
+          "Usage: %s image [-s <size>] [-c <8|256>] [-l 'ABCDeoi   ']\n",
           prog_name);
 }
 
