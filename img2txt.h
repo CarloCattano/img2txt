@@ -13,9 +13,9 @@
 
 #define CLS "\033[2J\033[H"
 #define RESET_COLOR "\033[0m"
-#define DENSITY "@/\\O1?oc^-,'.        "
+#define DENSITY "@O1oc^-;,'.      "
 #define MAX_WIDTH 1500
-#define ANSI_ESCAPE_SEQUENCE_MAX_LEN 13
+#define ANSI_ESCAPE_SEQUENCE_MAX_LEN 24
 
 // map 0 to 255 to 0 to 1
 #define MAP(x, in_min, in_max, out_min, out_max)                               \
@@ -150,6 +150,46 @@ static inline int get_closest_xterm_color(int r, int g, int b) {
     }
   }
   return best_color;
+}
+
+unsigned char *read_from_pipe(int *width, int *height, int *channels) {
+
+  unsigned char *img = NULL;
+  size_t capacity = 1024 * 1024;
+  size_t total_read = 0;
+
+  unsigned char *buffer = malloc(capacity);
+  if (!buffer) {
+    perror("Failed to allocate buffer for stdin");
+    exit(1);
+  }
+
+  size_t bytes_read;
+  while ((bytes_read = read(STDIN_FILENO, buffer + total_read,
+                            capacity - total_read)) > 0) {
+    total_read += bytes_read;
+    if (total_read == capacity) {
+      capacity *= 2;
+      unsigned char *new_buffer = realloc(buffer, capacity);
+      if (!new_buffer) {
+        perror("Failed to reallocate buffer for stdin");
+        free(buffer);
+        exit(1);
+      }
+      buffer = new_buffer;
+    }
+  }
+
+  if (total_read == 0) {
+    fprintf(stderr, "Error: No data read from stdin\n");
+    free(buffer);
+    exit(1);
+  }
+
+  img = stbi_load_from_memory(buffer, (int)total_read, width, height, channels,
+                              0);
+  free(buffer);
+  return img;
 }
 
 #endif // IMG2TXT_H

@@ -4,49 +4,11 @@
 #include <getopt.h>
 #include <unistd.h>
 
+#define BG_MODE 0
+
 void print_usage(const char *prog_name) {
   fprintf(stderr, "Usage: %s [-s <size>] [-c <8|256>] <image> or pipe\n",
           prog_name);
-}
-
-unsigned char *read_from_pipe(int *width, int *height, int *channels) {
-
-  unsigned char *img = NULL;
-  size_t capacity = 1024 * 1024;
-  size_t total_read = 0;
-
-  unsigned char *buffer = malloc(capacity);
-  if (!buffer) {
-    perror("Failed to allocate buffer for stdin");
-    exit(1);
-  }
-
-  size_t bytes_read;
-  while ((bytes_read = read(STDIN_FILENO, buffer + total_read,
-                            capacity - total_read)) > 0) {
-    total_read += bytes_read;
-    if (total_read == capacity) {
-      capacity *= 2;
-      unsigned char *new_buffer = realloc(buffer, capacity);
-      if (!new_buffer) {
-        perror("Failed to reallocate buffer for stdin");
-        free(buffer);
-        exit(1);
-      }
-      buffer = new_buffer;
-    }
-  }
-
-  if (total_read == 0) {
-    fprintf(stderr, "Error: No data read from stdin\n");
-    free(buffer);
-    exit(1);
-  }
-
-  img = stbi_load_from_memory(buffer, (int)total_read, width, height, channels,
-                              0);
-  free(buffer);
-  return img;
 }
 
 int main(int ac, char **av) {
@@ -55,9 +17,8 @@ int main(int ac, char **av) {
   int opt;
   int width, height, channels;
   unsigned char *img = NULL;
-  int clear_screen = 1;
 
-  while ((opt = getopt(ac, av, "s:c:C")) != -1) {
+  while ((opt = getopt(ac, av, "s:c")) != -1) {
     switch (opt) {
     case 's':
       new_width = atoi(optarg);
@@ -69,9 +30,6 @@ int main(int ac, char **av) {
         print_usage(av[0]);
         exit(1);
       }
-      break;
-    case 'C':
-      clear_screen = 0;
       break;
     default:
       print_usage(av[0]);
@@ -100,7 +58,6 @@ int main(int ac, char **av) {
   if (new_width == 0) {
     if (isatty(STDOUT_FILENO))
       new_width = get_terminal_width();
-
     else
       new_width = 80; // Default width if not a tty
   }
@@ -118,7 +75,7 @@ int main(int ac, char **av) {
 
   // Preserve aspect ratio, characters are roughly 2x taller than wide
   int new_height =
-      (int)((float)new_width * ((float)height / (float)width) / 2.4f);
+      (int)((float)new_width * ((float)height / (float)width) / 2.8f);
 
   unsigned char *new_img = malloc(new_width * new_height * channels);
   if (new_img == NULL) {
@@ -166,7 +123,10 @@ int main(int ac, char **av) {
         p += sprintf(p, "%s", colors8[color_index]);
       } else {
         int color_index = get_closest_xterm_color(r, g, b);
-        p += sprintf(p, "\033[38;5;%dm", color_index);
+        if (BG_MODE)
+          p += sprintf(p, "\033[38;5;%d;48;5;%dm", color_index, color_index);
+        else
+          p += sprintf(p, "\033[38;5;%dm", color_index); // Set foreground
       }
 
       float avg = (r + g + b) / 3.0;
@@ -177,9 +137,6 @@ int main(int ac, char **av) {
   }
   p += sprintf(p, "%s", RESET_COLOR);
   *p = '\0';
-
-  if (clear_screen)
-    write(1, CLS, 4); // clear screen
 
   write(1, output_buffer, strlen(output_buffer));
 

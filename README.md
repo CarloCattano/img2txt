@@ -1,7 +1,7 @@
 Adapted from Daniel Shifmann image/video to ascii originally in p5.js
 uses stb_image.h and stb_image_resize.h
 
-to be used in (ft_ascii)[https://github.com/carlocattano/ft_ascii]
+to be used in [ft_ascii](https://github.com/carlocattano/ft_ascii)
 
 Written in c with stb headers only library.
 
@@ -10,7 +10,9 @@ Written in c with stb headers only library.
 Build the tool
 
 ```
-./build.sh
+git clone https://github.com/carlocattano/img2txt
+cd img2txt
+make
 ```
 
 Run
