@@ -13,7 +13,7 @@
 
 #define CLS "\033[2J\033[H"
 #define RESET_COLOR "\033[0m"
-#define DENSITY "@O1oc^-;,'.      "
+#define DEFAULT_DENSITY "@O1oc^-;,'.      "
 #define MAX_WIDTH 1500
 #define ANSI_ESCAPE_SEQUENCE_MAX_LEN 24
 
@@ -134,6 +134,7 @@ const unsigned char xterm_colors[][3] = {
     {128, 128, 128}, {138, 138, 138}, {148, 148, 148}, {158, 158, 158},
     {168, 168, 168}, {178, 178, 178}, {188, 188, 188}, {198, 198, 198},
     {208, 208, 208}, {218, 218, 218}, {228, 228, 228}, {238, 238, 238}};
+
 const int num_xterm_colors = sizeof(xterm_colors) / sizeof(xterm_colors[0]);
 
 static inline int get_closest_xterm_color(int r, int g, int b) {

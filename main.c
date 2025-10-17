@@ -1,3 +1,4 @@
+#include <stdio.h>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "img2txt.h"
@@ -17,8 +18,9 @@ int main(int ac, char **av) {
   int opt;
   int width, height, channels;
   unsigned char *img = NULL;
+  const char *DENSITY = DEFAULT_DENSITY;
 
-  while ((opt = getopt(ac, av, "s:c")) != -1) {
+  while ((opt = getopt(ac, av, "s:c:l:")) != -1) {
     switch (opt) {
     case 's':
       new_width = atoi(optarg);
@@ -30,6 +32,9 @@ int main(int ac, char **av) {
         print_usage(av[0]);
         exit(1);
       }
+      break;
+    case 'l':
+      DENSITY = optarg;
       break;
     default:
       print_usage(av[0]);
